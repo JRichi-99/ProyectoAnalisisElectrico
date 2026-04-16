@@ -205,3 +205,38 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# ==========================================
+# CEN Project Specifics (Engineering & Data)
+# ==========================================
+
+# Ignorar las bases de datos originales de Access
+*.mdb
+*.accdb
+
+# Ignorar archivos de datos pesados (Raw y Procesados)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/*/.gitkeep
+
+# Ignorar archivos temporales de Excel que se crean al abrir archivos
+~$*.xlsx
+~$*.csv
+
+# Ignorar formatos de intercambio pesados
+*.parquet
+*.feather
+*.h5
+
+# Ignorar resultados finales (Gráficos y Tablas) 
+# Solo subiremos el código que los genera, no los archivos
+outputs/plots/*
+outputs/tables/*
+!outputs/plots/.gitkeep
+!outputs/tables/.gitkeep
+
+# Archivos de sistema (Windows/Mac)
+Thumbs.db
+.DS_Store
