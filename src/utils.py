@@ -1,4 +1,5 @@
 from pathlib import Path
+import pandas as pd
 
 def get_project_root() -> Path:
     """
