@@ -1,5 +1,5 @@
 import zipfile
-from utils import get_project_root
+from src.utils import get_project_root
 
 def unzip_data_base():
     root = get_project_root()
