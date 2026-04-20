@@ -4,7 +4,7 @@ from src.utils import get_project_root
 def preview_dataset():
     root = get_project_root()
     # Apuntamos al archivo que acabas de procesar
-    file_path = root / "data" / "processed" / "Period0" / "period0_with_zones.parquet"
+    file_path = root / "data" / "processed" / "Period0" / "period0_clustered.parquet"
     #file_path = root / "data" / "processed" / "2601" / "Promedio"/ "2601_mean.parquet"
 
     if file_path.exists():
@@ -21,6 +21,9 @@ def preview_dataset():
         print(df.sample(5).T)
         
         print(f"\nTotal de registros: {len(df)}")
+
+        # Cantidad de claves unicas
+        print(f"Claves únicas: {df['clave'].nunique()}")
     else:
         print("El archivo Parquet no fue encontrado. Verifica la ruta.")
 
