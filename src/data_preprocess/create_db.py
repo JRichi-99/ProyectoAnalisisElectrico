@@ -76,10 +76,6 @@ def save_Medidas():
             continue
 
         procesar_base_datos(db, data_processed, mis_filtros, cols, mis_dtypes)
-        
-        # OJO: Si quieres probar con una sola carpeta y que se detenga, descomenta el break de abajo.
-        # En producción, bórralo para que procese todo.
-        break 
 
 
 if __name__ == "__main__":
