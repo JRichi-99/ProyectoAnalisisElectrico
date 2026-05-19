@@ -232,10 +232,8 @@ data/processed/*
 
 # Ignorar resultados finales (Gráficos y Tablas) 
 # Solo subiremos el código que los genera, no los archivos
-outputs/plots/*
-outputs/tables/*
-!outputs/plots/.gitkeep
-!outputs/tables/.gitkeep
+outputs/*
+!outputs/.gitkeep
 
 # Archivos de sistema (Windows/Mac)
 Thumbs.db
