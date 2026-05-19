@@ -12,6 +12,7 @@ def assign_zone2key(n_period):
 
     # Limpieza del Maestro: Aseguramos que 'clave' sea string y quitamos duplicados 
     # por si una clave aparece en dos Excel distintos por error.
+    df_key_zone["zona"] = df_key_zone["zona"].astype(str).str.replace(r'[\s-]', '', regex=True)
     df_key_zone['clave'] = df_key_zone['clave'].astype(str).str.strip()
     df_key_zone = df_key_zone.drop_duplicates(subset=['clave'])
 

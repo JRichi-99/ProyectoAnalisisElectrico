@@ -119,7 +119,7 @@ def cluster_por_zona(n_period):
         df_centroides_final = pd.concat(lista_centroides, ignore_index=True)
         df_clusterizado_final = pd.concat(lista_datos_clusterizados, ignore_index=True)
         
-        centroides_path = period_folder / f"period{n_period}_centroides.parquet"
+        centroides_path = period_folder / f"period{n_period}_centroids.parquet"
         clustered_data_path = period_folder / f"period{n_period}_clustered.parquet"
         if centroides_path.exists() or clustered_data_path.exists():
             print(f"⚠️ Advertencia: Se sobrescribirán los archivos existentes en {period_folder.name}")

@@ -1,6 +1,9 @@
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 def get_project_root() -> Path:
     """
@@ -38,6 +41,11 @@ def get_avaible_yymmm():
     data_processed_path = get_data_processed_path()
     yymm_folders = [f.name for f in data_processed_path.iterdir() if f.is_dir() and "Period" not in f.name]
     return yymm_folders
+
+def get_output_path():
+    root = get_project_root()
+    return root / "output"
+    
 
 days_map = {
         "01": 31, "02": 28, "03": 31, "04": 30, "05": 31, "06": 30,
