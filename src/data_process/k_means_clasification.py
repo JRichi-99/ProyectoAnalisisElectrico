@@ -56,14 +56,10 @@ def find_optimal_k_dtw(
     print(f"✅ Codo DTW detectado en K={k_optimo}")
     return int(k_optimo)
 
-
-import pandas as pd
-# Asegúrate de tener importado find_optimal_k_dtw y KMedoidsDTW aquí también
-
 def cluster_por_macrozona(
     df: pd.DataFrame,
     *,
-    value_col: str = "medida",  # Ajustado al nombre de tu columna de valores
+    value_col: str = "medida",  
     window: int | None = 3,
     normalize: bool = False,
     k_max_global: int = 10,
@@ -73,28 +69,32 @@ def cluster_por_macrozona(
 ):
     """Cluster clients by macrozona using DTW over their hourly profiles."""
     
-    # 1. Validación estricta con TUS nombres de columnas
+    # Asumiendo que la columna se llama "Zona" o "macrozona" para hacer la diferencia
     required_cols = {"macrozona", "clave", "Hora", value_col}
     missing = required_cols.difference(df.columns)
     if missing:
-        raise ValueError(f"❌ Error: Faltan columnas obligatorias en el DataFrame: {sorted(missing)}")
+        raise ValueError(f"❌ Error: Faltan columnas obligatorias: {sorted(missing)}")
+
+    df = df.copy()
+    df["clave_unica"] = df["clave"].astype(str) + "_" + df["Zona"].astype(str)
 
     lista_centroides = []
     lista_datos_clusterizados = []
 
-    # 2. Iteración sobre cada macrozona única
     for mz in df["macrozona"].dropna().unique():
         df_zona = df[df["macrozona"] == mz].copy()
-        n_claves = df_zona["clave"].nunique()
+        
+        # Ahora contamos claves únicas reales
+        n_claves = df_zona["clave_unica"].nunique()
         n_filas = len(df_zona)
 
         print(f"\nMacrozona: {mz}")
         print(f" └─ Claves únicas (clientes/barras): {n_claves:,}")
         print(f" └─ Total de registros: {n_filas:,}")
 
-        # 3. Pivotar usando "Hora" (mayúscula) y "clave"
+        # PIVOTAR usando clave_unica
         df_wide = (
-            df_zona.pivot_table(index="clave", columns="Hora", values=value_col, aggfunc="mean")
+            df_zona.pivot_table(index="clave_unica", columns="Hora", values=value_col, aggfunc="mean")
             .sort_index(axis=1)
             .fillna(0.0)
         )
@@ -103,11 +103,9 @@ def cluster_por_macrozona(
             print(f"⚠️ Macrozona {mz} ignorada: insuficientes datos para clusterizar.")
             continue
 
-        # 4. Preparar matriz para el modelo
         X = df_wide.to_numpy(dtype=float)
         k_maximo_zona = min(k_max_global, len(df_wide) - 1)
         
-        # 5. Encontrar el K óptimo
         k_optimo = find_optimal_k_dtw(
             X,
             k_max=k_maximo_zona,
@@ -118,7 +116,6 @@ def cluster_por_macrozona(
             random_state=random_state,
         )
 
-        # 6. Ajustar el modelo final
         model = KMedoidsDTW(
             n_clusters=k_optimo,
             window=window,
@@ -130,24 +127,23 @@ def cluster_por_macrozona(
         ).fit(X)
 
         if model.labels_ is None or model.cluster_centers_ is None or model.medoid_indices_ is None:
-            raise RuntimeError(f"El modelo DTW no generó labels/medoids para la macrozona {mz}.")
+            raise RuntimeError(f"El modelo DTW no generó labels para {mz}.")
 
-        # 7. Resultado 1: Centros interpretables (Medoids)
+        # Centros
         df_centroides_wide = pd.DataFrame(model.cluster_centers_, columns=df_wide.columns)
         df_centroides_wide["id_cluster"] = range(k_optimo)
-        df_centroides_wide["macrozona"] = mz  # Actualizado
+        df_centroides_wide["macrozona"] = mz 
         df_centroides_wide["clave_medoid"] = df_wide.index[model.medoid_indices_].to_numpy()
         df_centroides_wide["dtw_inertia"] = model.inertia_
 
-        # Volver al formato "long" usando los nombres correctos
         df_resultado_1 = df_centroides_wide.melt(
             id_vars=["macrozona", "id_cluster", "clave_medoid", "dtw_inertia"],
             var_name="Hora",
             value_name=value_col,
         )
 
-        # 8. Resultado 2: Datos de entrada etiquetados
-        df_zona["id_cluster"] = df_zona["clave"].map(dict(zip(df_wide.index, model.labels_)))
+        # Etiquetar usando clave_unica
+        df_zona["id_cluster"] = df_zona["clave_unica"].map(dict(zip(df_wide.index, model.labels_)))
         df_zona["metodo_cluster"] = "kmedoids_dtw"
         df_zona["dtw_window"] = -1 if window is None else window
         df_zona["dtw_normalize"] = normalize
@@ -155,17 +151,119 @@ def cluster_por_macrozona(
         lista_centroides.append(df_resultado_1)
         lista_datos_clusterizados.append(df_zona)
 
-    # 9. Consolidar resultados finales
     if not lista_centroides:
-        print("\n❌ Error: No se generaron clusters válidos.")
+        print("\nError: No se generaron clusters válidos.")
         return None, None
 
     df_centroides_final = pd.concat(lista_centroides, ignore_index=True)
     df_clusterizado_final = pd.concat(lista_datos_clusterizados, ignore_index=True)
 
-    print("\n✅ PROCESO COMPLETADO EXITOSAMENTE CON DTW")
-    
+    print("\nPROCESO COMPLETADO EXITOSAMENTE CON DTW")
     return df_centroides_final, df_clusterizado_final
+
+def subcluster_macrozona_cluster(
+    df: pd.DataFrame,
+    macrozona_target: str,
+    cluster_target: int,
+    *,
+    value_col: str = "medida",
+    window: int | None = 3,
+    normalize: bool = False,
+    k_max_global: int = 8,  
+    n_init: int = 5,
+    max_iter: int = 30,
+    random_state: int = 42,
+):
+    """
+    Realiza una subclusterizacion DTW sobre un cluster especifico de una macrozona.
+    Requiere que el DataFrame de entrada ya tenga las columnas 'macrozona' e 'id_cluster'.
+    """
+    required_cols = {"macrozona", "clave", "Hora", value_col, "id_cluster"}
+    missing = required_cols.difference(df.columns)
+    if missing:
+        raise ValueError(f"Error: Faltan columnas en el DataFrame: {sorted(missing)}")
+
+    # 1. Filtrar los datos objetivo
+    mask = (df["macrozona"] == macrozona_target) & (df["id_cluster"] == cluster_target)
+    df_sub = df[mask].copy()
+
+    if df_sub.empty:
+        print(f"Atencion: No se encontraron datos para la macrozona '{macrozona_target}' y cluster {cluster_target}.")
+        return None, None
+
+    # Crear clave unica para evitar colisiones de dimensiones por duplicados de nombre
+    df_sub["clave_unica"] = df_sub["clave"].astype(str) + "_" + df_sub["Zona"].astype(str)
+
+    n_claves = df_sub["clave_unica"].nunique()
+    n_filas = len(df_sub)
+
+    print(f"\n--- SUBCLUSTERIZANDO ---")
+    print(f"Macrozona: {macrozona_target} | Cluster Padre: {cluster_target}")
+    print(f" |- Claves unicas a procesar: {n_claves:,}")
+    print(f" |- Total de registros: {n_filas:,}")
+
+    if n_claves < 3:
+        print("Atencion: Insuficientes clientes para subclusterizar (se requieren al menos 3).")
+        return None, None
+
+    # 2. Pivotar formato Wide usando clave_unica
+    df_wide = (
+        df_sub.pivot_table(index="clave_unica", columns="Hora", values=value_col, aggfunc="mean")
+        .sort_index(axis=1)
+        .fillna(0.0)
+    )
+
+    # 3. Preparar matriz y buscar K optimo
+    X = df_wide.to_numpy(dtype=float)
+    k_maximo_zona = min(k_max_global, len(df_wide) - 1)
+
+    k_optimo = find_optimal_k_dtw(
+        X,
+        k_max=k_maximo_zona,
+        window=window,
+        normalize=normalize,
+        n_init=max(1, min(n_init, 3)),
+        max_iter=max_iter,
+        random_state=random_state,
+    )
+
+    # 4. Ajustar modelo final
+    model = KMedoidsDTW(
+        n_clusters=k_optimo,
+        window=window,
+        normalize=normalize,
+        n_init=n_init,
+        max_iter=max_iter,
+        random_state=random_state,
+        verbose=False,
+    ).fit(X)
+
+    if model.labels_ is None or model.cluster_centers_ is None or model.medoid_indices_ is None:
+        raise RuntimeError("El modelo DTW no genero resultados para la subclusterizacion.")
+
+    # 5. Resultado 1: Nuevos Centroides (Medoids)
+    df_centroides_wide = pd.DataFrame(model.cluster_centers_, columns=df_wide.columns)
+    df_centroides_wide["id_subcluster"] = range(k_optimo)
+    df_centroides_wide["id_cluster_padre"] = cluster_target
+    df_centroides_wide["macrozona"] = macrozona_target
+    df_centroides_wide["clave_medoid"] = df_wide.index[model.medoid_indices_].to_numpy()
+    df_centroides_wide["dtw_inertia"] = model.inertia_
+
+    # Volver a formato "long"
+    df_centroides_final = df_centroides_wide.melt(
+        id_vars=["macrozona", "id_cluster_padre", "id_subcluster", "clave_medoid", "dtw_inertia"],
+        var_name="Hora",
+        value_name=value_col,
+    )
+
+    # 6. Resultado 2: Datos mapeados usando la clave_unica
+    map_subclusters = dict(zip(df_wide.index, model.labels_))
+    df_sub["id_subcluster"] = df_sub["clave_unica"].map(map_subclusters)
+
+    print("\nSUBCLUSTERIZACION COMPLETADA CON EXITO")
+    
+    return df_centroides_final, df_sub
+
 
 
 if __name__ == "__main__":

@@ -232,6 +232,7 @@ data/processed/*
 
 # Ignorar resultados finales (Gráficos y Tablas) 
 # Solo subiremos el código que los genera, no los archivos
+src/IgnarioArias/data/*
 outputs/*
 !outputs/.gitkeep
 
